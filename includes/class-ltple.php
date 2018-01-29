@@ -58,8 +58,6 @@ class LTPLE_App_Tumblr {
 			
 			add_action( 'wp_head', array( $this, 'get_header') );
 			add_action( 'wp_footer', array( $this, 'get_footer') );
-			
-			add_action( 'ltple_alternative_login', array( $this, 'get_login_button' ));
 		}
 		
 		// Handle localisation

@@ -27,7 +27,7 @@ class LTPLE_Integrator_Tumblr {
 			
 			$tblr_consumer_key 		= array_search('tblr_consumer_key', $parameters['key']);
 			$tblr_consumer_secret 	= array_search('tblr_consumer_secret', $parameters['key']);
-			$tblr_oauth_callback 	= $this->parent->urls->editor;
+			$tblr_oauth_callback 	= $this->parent->urls->apps;
 
 			if( !empty($parameters['value'][$tblr_consumer_key]) && !empty($parameters['value'][$tblr_consumer_secret]) ){
 			
@@ -154,8 +154,12 @@ class LTPLE_Integrator_Tumblr {
 
 				if(isset($_REQUEST['oauth_token']) && $this->request_token['oauth_token'] !== $_REQUEST['oauth_token']) {
 					
-					//flush session
-					session_destroy();
+					if(!empty($_SESSION)){
+							
+						//flush session
+							
+						$_SESSION = array();			
+					}	
 					
 					// store failure message
 
@@ -268,10 +272,11 @@ class LTPLE_Integrator_Tumblr {
 						$_SESSION['message'] .= '</div>';						
 					}
 				}
-				else{
-					
+				elseif(!empty($_SESSION)){
+						
 					//flush session
-					session_destroy();					
+						
+					$_SESSION = array();			
 				}
 			}
 

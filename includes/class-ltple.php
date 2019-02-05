@@ -139,7 +139,17 @@ class LTPLE_App_Tumblr {
 	public function get_footer(){
 		
 		
-	}	
+	}
+	
+	public function get_user_profile_url($app){
+		
+		return 'https://' . $app->user_name . '.tumblr.com';
+	}						
+	
+	public function get_social_icon_url($app){
+		
+		return $this->assets_url . 'images/social-icon.png';
+	}
 
 	/**
 	 * Wrapper function to register a new post type

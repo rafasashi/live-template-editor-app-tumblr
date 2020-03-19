@@ -63,6 +63,10 @@ class LTPLE_Integrator_Tumblr {
 			}
 		}
 	}
+	
+	public function init_app(){	
+		
+	} 
 
 	public function appImportImg(){
 		

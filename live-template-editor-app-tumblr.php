@@ -23,7 +23,7 @@
 	*/
 	
 	if ( ! defined( 'ABSPATH' ) ) exit;
-	
+
 	/**
 	 * Returns the main instance of LTPLE_App_Tumblr to prevent the need to use globals.
 	 *
@@ -32,6 +32,8 @@
 	 */
 	function LTPLE_App_Tumblr ( $version = '1.0.0' ) {
 		
+		if ( ! class_exists( 'LTPLE_Client' ) ) return;
+	
 		$instance = LTPLE_Client::instance( __FILE__, $version );
 		
 		if ( empty( $instance->App_Tumblr ) ) {

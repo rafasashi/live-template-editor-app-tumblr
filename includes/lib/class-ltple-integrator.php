@@ -38,51 +38,6 @@ class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 		}
 	}
 
-	public function appImportImg(){
-		
-		if(!empty($_REQUEST['id'])){
-		
-			if( $this->app = $this->parent->apps->getAppData( $_REQUEST['id'], $this->parent->user->ID ) ){
-				
-				$client = new Tumblr\API\Client(CONSUMER_KEY, CONSUMER_SECRET, $this->app->oauth_token, $this->app->oauth_token_secret);
-										
-				$blog = $client->getBlogPosts($this->app->user_name);
-				
-				$urls = [];
-				
-				if(!empty($blog->posts)){
-					
-					foreach($blog->posts as $item){
-						
-						if(!empty($item->photos)){
-							
-							foreach($item->photos as $photo){
-								
-								$img_title	= basename($photo->original_size->url);
-								$img_url	= $photo->original_size->url;
-								
-								if(!get_page_by_title( $img_title, OBJECT, 'user-image' )){
-									
-									if($image_id = wp_insert_post(array(
-								
-										'post_author' 	=> $this->parent->user->ID,
-										'post_title' 	=> $img_title,
-										'post_content' 	=> $img_url,
-										'post_type' 	=> 'user-image',
-										'post_status' 	=> 'publish'
-									))){
-										
-										wp_set_object_terms( $image_id, $this->term->term_id, 'app-type' );
-									}
-								}						
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-	
 	public function appConnect(){
 		
 		$client = new Tumblr\API\Client(CONSUMER_KEY, CONSUMER_SECRET);
@@ -92,22 +47,19 @@ class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 			$this->connection = $client->getRequestHandler();
 			$this->connection->setBaseUrl('https://www.tumblr.com/');
 
-			if( !$oauth_token = $this->parent->session->get_user_data('oauth_token') ){
-				
-				// start the old gal up
-				$resp = $this->connection->request('POST', 'oauth/request_token', array());
-				
-				// get the oauth_token
-				parse_str($resp->body, $this->request_token);
-				
-				$this->parent->session->update_user_data('app',$this->app_slug);
-				$this->parent->session->update_user_data('action',$_REQUEST['action']);
-				$this->parent->session->update_user_data('ref',$this->get_ref_url());
-				
-				$this->parent->session->update_user_data('oauth_token',$this->request_token['oauth_token']);
-				$this->parent->session->update_user_data('oauth_token_secret',$this->request_token['oauth_token_secret']);			
-			}
+			// start the old gal up
+			$resp = $this->connection->request('POST', 'oauth/request_token', array());
 			
+			// get the oauth_token
+			parse_str($resp->body, $this->request_token);
+			
+			$this->parent->session->update_user_data('app',$this->app_slug);
+			$this->parent->session->update_user_data('action',$_REQUEST['action']);
+			$this->parent->session->update_user_data('ref',$this->get_ref_url());
+			
+			$this->parent->session->update_user_data('oauth_token',$this->request_token['oauth_token']);
+			$this->parent->session->update_user_data('oauth_token_secret',$this->request_token['oauth_token_secret']);			
+	
 			if( !empty($this->request_token['oauth_token']) ){
 			
 				$this->oauth_url = 'https://www.tumblr.com/oauth/authorize?oauth_token=' . $this->request_token['oauth_token'];
@@ -117,7 +69,7 @@ class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 				exit;		
 			}
 		}
-		elseif( !$access_token = $this->parent->session->get_user_data('access_token') ){
+		elseif(isset($_REQUEST['oauth_token'])){
 			
 			// handle connect callback
 			
@@ -228,20 +180,65 @@ class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 						
 				$message .= '</div>';
 
-				$this->parent->session->update_user_data('message',$message);	
-				
-				if( $redirect_url = $this->parent->session->get_user_data('ref') ){
-					
-					wp_redirect($redirect_url);
-					echo 'Redirecting tumblr callback...';
-					exit;	
-				}
+				$this->parent->session->update_user_data('message',$message);
 			}
 			else{
 					
 				//flush session
 				
 				$this->reset_session();
+			}
+				
+			if( $redirect_url = $this->parent->session->get_user_data('ref') ){
+				
+				wp_redirect($redirect_url);
+				echo 'Redirecting tumblr callback...';
+				exit;	
+			}
+		}
+	}
+	
+	public function appImportImg(){
+		
+		if(!empty($_REQUEST['id'])){
+		
+			if( $this->app = $this->parent->apps->getAppData( $_REQUEST['id'], $this->parent->user->ID ) ){
+				
+				$client = new Tumblr\API\Client(CONSUMER_KEY, CONSUMER_SECRET, $this->app->oauth_token, $this->app->oauth_token_secret);
+										
+				$blog = $client->getBlogPosts($this->app->user_name);
+				
+				$urls = [];
+				
+				if(!empty($blog->posts)){
+					
+					foreach($blog->posts as $item){
+						
+						if(!empty($item->photos)){
+							
+							foreach($item->photos as $photo){
+								
+								$img_title	= basename($photo->original_size->url);
+								$img_url	= $photo->original_size->url;
+								
+								if(!get_page_by_title( $img_title, OBJECT, 'user-image' )){
+									
+									if($image_id = wp_insert_post(array(
+								
+										'post_author' 	=> $this->parent->user->ID,
+										'post_title' 	=> $img_title,
+										'post_content' 	=> $img_url,
+										'post_type' 	=> 'user-image',
+										'post_status' 	=> 'publish'
+									))){
+										
+										wp_set_object_terms( $image_id, $this->term->term_id, 'app-type' );
+									}
+								}						
+							}
+						}
+					}
+				}
 			}
 		}
 	}

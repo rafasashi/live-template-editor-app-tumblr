@@ -2,71 +2,41 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class LTPLE_Integrator_Tumblr {
+class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 	
-	var $parent;
-	var $apps;
+	public function init_app() {
 
-	/**
-	 * Constructor function
-	 */
-	public function __construct ( $app_slug, $parent, $apps ) {
-
-		$this->parent 		= $parent;
-		$this->parent->apps = $apps;
-
-		// get app term
-
-		$this->term = get_term_by('slug',$app_slug,'app-type');
-		
-		// get app parameters
-		
-		$parameters = get_option('parameters_'.$app_slug);
-		
-		if( isset($parameters['key']) ){
+		if( isset($this->parameters['key']) ){
 			
-			$tblr_consumer_key 		= array_search('tblr_consumer_key', $parameters['key']);
-			$tblr_consumer_secret 	= array_search('tblr_consumer_secret', $parameters['key']);
+			$tblr_consumer_key 		= array_search('tblr_consumer_key', $this->parameters['key']);
+			$tblr_consumer_secret 	= array_search('tblr_consumer_secret', $this->parameters['key']);
 			$tblr_oauth_callback 	= $this->parent->urls->apps;
-
-			if( !empty($parameters['value'][$tblr_consumer_key]) && !empty($parameters['value'][$tblr_consumer_secret]) ){
 			
-				define('CONSUMER_KEY', 		$parameters['value'][$tblr_consumer_key]);
-				define('CONSUMER_SECRET', 	$parameters['value'][$tblr_consumer_secret]);
+			if( !empty($this->parameters['value'][$tblr_consumer_key]) && !empty($this->parameters['value'][$tblr_consumer_secret]) ){
+			
+				define('CONSUMER_KEY', 		$this->parameters['value'][$tblr_consumer_key]);
+				define('CONSUMER_SECRET', 	$this->parameters['value'][$tblr_consumer_secret]);
 				//define('OAUTH_CALLBACK', 	$tblr_oauth_callback);
 
-				// get current action
+				// init action
+		
+				if( $action = $this->get_current_action() ){
 				
-				if(!empty($_REQUEST['action'])){
-					
-					$this->action = $_REQUEST['action'];
-				}
-				elseif(!empty($_SESSION['action'])){
-					
-					$this->action = $_SESSION['action'];
-				}
-				
-				$methodName = 'app'.ucfirst($this->action);
-
-				if(method_exists($this,$methodName)){
-					
-					$this->$methodName();
+					$this->init_action($action);
 				}
 			}
 			else{
 				
-				$_SESSION['message'] = '<div class="alert alert-danger">';
+				$message = '<div class="alert alert-danger">';
 					
-					$_SESSION['message'] .= 'Sorry, tumblr is not available on this platform yet, please contact the dev team...';
+					$message .= 'Sorry, tumblr is not yet available on this platform, please contact the dev team...';
 						
-				$_SESSION['message'] .= '</div>';				
+				$message .= '</div>';
+
+				$this->parent->session->update_user_data('message',$message);
 			}
 		}
 	}
-	
-	public function init_app(){	
-		
-	} 
 
 	public function appImportImg(){
 		
@@ -122,169 +92,167 @@ class LTPLE_Integrator_Tumblr {
 			$this->connection = $client->getRequestHandler();
 			$this->connection->setBaseUrl('https://www.tumblr.com/');
 
-			if(!isset($_SESSION['oauth_token'])){
+			if( !$oauth_token = $this->parent->session->get_user_data('oauth_token') ){
 				
 				// start the old gal up
 				$resp = $this->connection->request('POST', 'oauth/request_token', array());
 				
 				// get the oauth_token
 				parse_str($resp->body, $this->request_token);
-
-				$_SESSION['app'] 				= 'tumblr';
-				$_SESSION['action'] 			= $_REQUEST['action'];
-				$_SESSION['ref'] 				= ( !empty($_REQUEST['ref']) ? $this->parent->request->proto . urldecode($_REQUEST['ref']) : '');
-				$_SESSION['oauth_token'] 		= $this->request_token['oauth_token'];
-				$_SESSION['oauth_token_secret'] = $this->request_token['oauth_token_secret'];			
+				
+				$this->parent->session->update_user_data('app',$this->app_slug);
+				$this->parent->session->update_user_data('action',$_REQUEST['action']);
+				$this->parent->session->update_user_data('ref',$this->get_ref_url());
+				
+				$this->parent->session->update_user_data('oauth_token',$this->request_token['oauth_token']);
+				$this->parent->session->update_user_data('oauth_token_secret',$this->request_token['oauth_token_secret']);			
 			}
 			
-			if(isset($_SESSION['oauth_token'])){
+			if( !empty($this->request_token['oauth_token']) ){
 			
-				$this->oauth_url = 'https://www.tumblr.com/oauth/authorize?oauth_token=' . $_SESSION['oauth_token'];
+				$this->oauth_url = 'https://www.tumblr.com/oauth/authorize?oauth_token=' . $this->request_token['oauth_token'];
 				
 				wp_redirect($this->oauth_url);
 				echo 'Redirecting tumblr oauth...';
 				exit;		
 			}
 		}
-		elseif( isset($_SESSION['action']) ){
+		elseif( !$access_token = $this->parent->session->get_user_data('access_token') ){
 			
-			if(!isset($_SESSION['access_token'])){
+			// handle connect callback
+			
+			$this->request_token = [];
+			$this->request_token['oauth_token'] 		= $this->parent->session->get_user_data('oauth_token');
+			$this->request_token['oauth_token_secret'] 	= $this->parent->session->get_user_data('oauth_token_secret');
+
+			if(isset($_REQUEST['oauth_token']) && $this->request_token['oauth_token'] !== $_REQUEST['oauth_token']) {
 				
-				// handle connect callback
+				$this->reset_session();	
 				
-				$this->request_token = [];
-				$this->request_token['oauth_token'] 		= $_SESSION['oauth_token'];
-				$this->request_token['oauth_token_secret'] 	= $_SESSION['oauth_token_secret'];
+				// store failure message
 
-				if(isset($_REQUEST['oauth_token']) && $this->request_token['oauth_token'] !== $_REQUEST['oauth_token']) {
+				$message = '<div class="alert alert-danger">';
 					
-					if(!empty($_SESSION)){
+					$message .= 'Tumblr connection failed...';
+						
+				$message .= '</div>';
+				
+				$this->parent->session->update_user_data('message',$message);
+			}
+			elseif(isset($_REQUEST['oauth_verifier'])){
+				
+				// set temporary oauth_token
+				
+				$client->setToken($this->request_token['oauth_token'],$this->request_token['oauth_token_secret']);
+				
+				// get new Request Handler
+				
+				$this->connection = $client->getRequestHandler();
+				$this->connection->setBaseUrl('https://www.tumblr.com/');			
+				
+				//get the long lived access_token that authorized to act as the user
+				
+				$resp = $this->connection->request('POST', 'oauth/access_token', array('oauth_verifier' => $_REQUEST['oauth_verifier']));
+				parse_str($resp->body, $this->access_token);
+
+				//flush session
+				
+				$this->reset_session();
+
+				//store access_token in session					
+
+				$this->parent->session->update_user_data('access_token',$this->access_token);
+				
+				// set access oauth_token
+				$client = new Tumblr\API\Client(CONSUMER_KEY, CONSUMER_SECRET, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
+				
+				// get user info
+				
+				$info = $client->getUserInfo();
+
+				if(!empty($info->user->blogs)){
+					
+					// append user name
+					
+					$this->access_token['user_name'] = $info->user->name;
+					
+					// get main account token
+					
+					foreach($info->user->blogs as $blog){
+
+						if( $blog->admin === true ){
 							
-						//flush session
+							// store access_token in database		
 							
-						$_SESSION = array();			
-					}	
-					
-					// store failure message
-
-					$_SESSION['message'] = '<div class="alert alert-danger">';
-						
-						$_SESSION['message'] .= 'Tumblr connection failed...';
+							$app_title = wp_strip_all_tags( 'tumblr - ' . $blog->name );
 							
-					$_SESSION['message'] .= '</div>';
-				}
-				elseif(isset($_REQUEST['oauth_verifier'])){
-					
-					// set temporary oauth_token
-					
-					$client->setToken($_SESSION['oauth_token'], $_SESSION['oauth_token_secret']);
-					
-					// get new Request Handler
-					
-					$this->connection = $client->getRequestHandler();
-					$this->connection->setBaseUrl('https://www.tumblr.com/');			
-					
-					//get the long lived access_token that authorized to act as the user
-					
-					$resp = $this->connection->request('POST', 'oauth/access_token', array('oauth_verifier' => $_REQUEST['oauth_verifier']));
-					parse_str($resp->body, $this->access_token);
-
-					//flush session
-					session_destroy();
-
-					//store access_token in session					
-					
-					$_SESSION['access_token'] = $this->access_token;
-					
-					// set access oauth_token
-					$client = new Tumblr\API\Client(CONSUMER_KEY, CONSUMER_SECRET, $this->access_token['oauth_token'], $this->access_token['oauth_token_secret']);
-					
-					// get user info
-					
-					$info = $client->getUserInfo();
-
-					if(!empty($info->user->blogs)){
-						
-						// append user name
-						
-						$this->access_token['user_name'] = $info->user->name;
-						
-						// get main account token
-						
-						//$this->main_token = $this->parent->apps->getAppData( get_option( $this->parent->_base . 'tblr_main_account' ));
-						
-						foreach($info->user->blogs as $blog){
-
-							if( $blog->admin === true ){
-								
-								// store access_token in database		
-								
-								$app_title = wp_strip_all_tags( 'tumblr - ' . $blog->name );
-								
-								$app_item = get_page_by_title( $app_title, OBJECT, 'user-app' );
-								
-								if( empty($app_item) ){
-									
-									// create app item
-									
-									$app_id = wp_insert_post(array(
-									
-										'post_title'   	 	=> $app_title,
-										'post_status'   	=> 'publish',
-										'post_type'  	 	=> 'user-app',
-										'post_author'   	=> $this->parent->user->ID
-									));
-									
-									wp_set_object_terms( $app_id, $this->term->term_id, 'app-type' );
-									
-									// hook connected app
-									
-									do_action( 'ltple_thumblr_account_connected');
-									
-									$this->parent->apps->newAppConnected();
-								}
-								else{
-									
-									$app_id = $app_item->ID;
-								}
-									
-								// update app item
-									
-								update_post_meta( $app_id, 'appData', json_encode($this->access_token,JSON_PRETTY_PRINT));							
-							}							
-						}
-					}
-					
-					if(!empty($_SESSION['ref'])){
-						
-						$redirect_url = $_SESSION['ref'];
-						
-						$_SESSION['ref'] = '';
-						
-						wp_redirect($redirect_url);
-						echo 'Redirecting tumblr callback...';
-						exit;	
-					}
-					else{
-						
-						// store success message
-
-						$_SESSION['message'] = '<div class="alert alert-success">';
+							$app_item = get_page_by_title( $app_title, OBJECT, 'user-app' );
 							
-							$_SESSION['message'] .= 'Congratulations, you have successfully connected a Tumblr account!';
+							if( empty($app_item) ){
 								
-						$_SESSION['message'] .= '</div>';						
+								// create app item
+								
+								$app_id = wp_insert_post(array(
+								
+									'post_title'   	 	=> $app_title,
+									'post_status'   	=> 'publish',
+									'post_type'  	 	=> 'user-app',
+									'post_author'   	=> $this->parent->user->ID
+								));
+								
+								wp_set_object_terms( $app_id, $this->term->term_id, 'app-type' );
+								
+								// hook connected app
+								
+								do_action( 'ltple_thumblr_account_connected');
+								
+								$this->parent->apps->newAppConnected();
+							}
+							else{
+								
+								$app_id = $app_item->ID;
+							}
+								
+							// update app item
+								
+							update_post_meta( $app_id, 'appData', json_encode($this->access_token,JSON_PRETTY_PRINT));							
+						}							
 					}
 				}
-				elseif(!empty($_SESSION)){
+				
+				// store success message
+
+				$message = '<div class="alert alert-success">';
+					
+					$message .= 'Congratulations, you have successfully connected a Tumblr account!';
 						
-					//flush session
-						
-					$_SESSION = array();			
+				$message .= '</div>';
+
+				$this->parent->session->update_user_data('message',$message);	
+				
+				if( $redirect_url = $this->parent->session->get_user_data('ref') ){
+					
+					wp_redirect($redirect_url);
+					echo 'Redirecting tumblr callback...';
+					exit;	
 				}
 			}
-
-			//var_dump($this->parent->user->ID);exit;
+			else{
+					
+				//flush session
+				
+				$this->reset_session();
+			}
 		}
+	}
+	
+	public function reset_session(){
+		
+		$this->parent->session->update_user_data('access_token','');		
+		$this->parent->session->update_user_data('oauth_token','');
+		$this->parent->session->update_user_data('oauth_token_secret','');
+		$this->parent->session->update_user_data('ref',$this->get_ref_url());		
+		
+		return true;
 	}
 }

@@ -2,7 +2,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-class LTPLE_App_Tumblr {
+class LTPLE_App_Tumblr extends LTPLE_Client_App {
 
 	/**
 	 * The single instance of LTPLE_App_Tumblr.

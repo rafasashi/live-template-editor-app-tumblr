@@ -1,7 +1,7 @@
 <?php
 /*
  * Plugin Name: Live Template Editor App Tumblr
- * Version: 1.0.0.4
+ * Version: 1.0.0.5
  * Plugin URI: https://github.com/rafasashi
  * Description: Tumblr API integrator for Live Template Editor.
  * Author: Rafasashi

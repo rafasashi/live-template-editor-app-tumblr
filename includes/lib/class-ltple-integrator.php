@@ -17,13 +17,6 @@ class LTPLE_Integrator_Tumblr extends LTPLE_Client_Integrator {
 				define('CONSUMER_KEY', 		$this->parameters['value'][$tblr_consumer_key]);
 				define('CONSUMER_SECRET', 	$this->parameters['value'][$tblr_consumer_secret]);
 				//define('OAUTH_CALLBACK', 	$tblr_oauth_callback);
-
-				// init action
-		
-				if( $action = $this->get_current_action() ){
-				
-					$this->init_action($action);
-				}
 			}
 			else{
 				
